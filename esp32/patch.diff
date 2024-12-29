@@ -1,0 +1,16 @@
+--- a/libraries/WebServer/src/Parsing.cpp
++++ b/libraries/WebServer/src/Parsing.cpp
+@@ -123,7 +123,7 @@ void WebServer::_parseArguments(String data) {
+           // Handle plain value
+           char* plainBuf = (char*)malloc(plainLength + 1);
+           urlDecode(data.c_str() + pos, plainBuf, plainLength);
+-          arg.value = String(plainBuf);
++          arg.value = String(plainBuf, plainLength);
+           free(plainBuf);
+ 
+@@ -145,7 +145,7 @@ void WebServer::_parseArguments(String data) {
+        } else if (headerValue.startsWith(F("application/x-www-form-urlencoded"))){
+          isForm = false;
+-         isEncoded = true;                    
++          // isEncoded = true;
+            break;

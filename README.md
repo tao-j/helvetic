@@ -2,6 +2,8 @@
 
 *helvetic* is an application that replaces the web service for the FitBit Aria.
 
+It can be either run as Python webserver or on ESP32 with BLE support.
+
 The software is a work-in-progress, and runs as a Django application.  It also includes a bare-bones implementation of the protocol for testing, which uses bottle.py (and stores no data).
 
 It requires local DNS spoofing in order to intercept requests originally bound for `fitbit.com`.

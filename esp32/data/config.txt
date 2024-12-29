@@ -1,0 +1,7 @@
+ssid=YourSSID
+password=YourPassword
+deviceName=openScale
+userName=You
+age=18
+height=1800
+gender=2
