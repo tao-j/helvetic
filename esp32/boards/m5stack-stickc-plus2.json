@@ -13,7 +13,7 @@
         "f_flash": "80000000L",
         "flash_mode": "qio",
         "mcu": "esp32",
-        "variant": "m5stick_c"
+        "variant": "m5stack_stickc_plus2"
     },
     "frameworks": [
         "arduino",

@@ -32,12 +32,14 @@ public:
     ScaleBLEService();
     void begin();
     void setAndNotifyMeasurement(const WeightHistoryRecord &measurement);
+    uint32_t getConnectedCount() { return pServer ? pServer->getConnectedCount() : 0; }
+    WeightHistoryRecord getLastMeasurement() { return mLastMeasurement; }
+    const char* getLastStatus() { return mLastStatus; }
 
 private:
-    // Write callback
-    void onWrite(NimBLECharacteristic *pCharacteristic) override;
-    // Disconnect callback
-    void onDisconnect(NimBLEServer *pServer) override;
+    // NimBLECharacteristicCallbacks
+    void onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo& connInfo) override;
+    void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo, int reason) override;
 
     NimBLEServer *pServer = nullptr;
 
@@ -86,4 +88,5 @@ private:
 
     // Last measurement
     WeightHistoryRecord mLastMeasurement = {0};
+    const char* mLastStatus = "Idle";
 };

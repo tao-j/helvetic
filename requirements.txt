@@ -1,4 +1,4 @@
 crc16
 python-dateutil
 pytz
-Django==1.11
+Django

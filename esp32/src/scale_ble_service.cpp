@@ -1,6 +1,6 @@
 #include "scale_ble_service.h"
 #include <esp_log.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 static const char *TAG = "BLE_SCALE";
 const char *ScaleBLEService::LAST_MEASUREMENT_FILE = "/last_measurement.bin";
@@ -14,13 +14,13 @@ void ScaleBLEService::begin()
 {
     ESP_LOGI(TAG, "Initializing ScaleBLEService");
 
-    // Initialize SPIFFS
-    if (!SPIFFS.begin(true))
+    // Initialize LittleFS
+    if (!LittleFS.begin(true))
     {
-        ESP_LOGE(TAG, "Failed to mount SPIFFS");
+        ESP_LOGE(TAG, "Failed to mount LittleFS");
         return;
     }
-    ESP_LOGI(TAG, "SPIFFS mounted successfully");
+    ESP_LOGI(TAG, "LittleFS mounted successfully");
 
     // Try to load last measurement
     ESP_LOGI(TAG, "Attempting to load last measurement");
@@ -56,7 +56,7 @@ void ScaleBLEService::begin()
     setMeasurementServiceData(mLastMeasurement);
     pAdvertising->setServiceData(NimBLEUUID((uint16_t)0x181B), std::string((char *)mServiceData, 13));
 
-    pAdvertising->setScanResponse(true);
+    pAdvertising->enableScanResponse(true);
     // Set minimum connection interval preference for better power efficiency
     // 0x12 = 18 * 1.25ms = 22.5ms minimum connection interval
     pAdvertising->setMinInterval(0x20); // Minimum advertising interval
@@ -71,10 +71,10 @@ bool ScaleBLEService::loadLastMeasurement()
     ESP_LOGI(TAG, "Checking for measurement file: %s", LAST_MEASUREMENT_FILE);
     ESP_LOGI(TAG, "WeightHistoryRecord size: %d bytes", sizeof(WeightHistoryRecord));
 
-    if (SPIFFS.exists(LAST_MEASUREMENT_FILE))
+    if (LittleFS.exists(LAST_MEASUREMENT_FILE))
     {
-        ESP_LOGI(TAG, "Found existing measurement file, reading...");
-        File file = SPIFFS.open(LAST_MEASUREMENT_FILE, "rb");
+        ESP_LOGD(TAG, "Loading last measurement from LittleFS");
+        File file = LittleFS.open(LAST_MEASUREMENT_FILE, "rb");
         if (!file)
         {
             ESP_LOGE(TAG, "Failed to open measurement file for reading");
@@ -121,7 +121,7 @@ bool ScaleBLEService::loadLastMeasurement()
 
 bool ScaleBLEService::saveLastMeasurement()
 {
-    File file = SPIFFS.open(LAST_MEASUREMENT_FILE, "wb");
+    File file = LittleFS.open(LAST_MEASUREMENT_FILE, "wb");
     if (!file)
     {
         ESP_LOGE(TAG, "Failed to open measurement file for writing");
@@ -157,7 +157,7 @@ void ScaleBLEService::setupWeightScaleService()
     pWssMeasurementCharacteristic->setCallbacks(this);
 
     // Start the service
-    pWssService->start();
+    // pWssService->start(); // Deprecated in v2.5.0
     ESP_LOGI(TAG, "Weight Scale Service (WSS) setup complete");
 }
 
@@ -175,7 +175,7 @@ void ScaleBLEService::setupBodyCompositionService()
     pBcsCharacteristic->setCallbacks(this);
 
     // Start the service
-    pBcsService->start();
+    // pBcsService->start(); // Deprecated in v2.5.0
     ESP_LOGI(TAG, "Body Composition Service (BCS) setup complete");
 }
 
@@ -194,7 +194,7 @@ void ScaleBLEService::setupHm10WeightService()
     pHm10MeasurementCharacteristic->setCallbacks(this);
 
     // Start the service
-    pHm10Service->start();
+    // pHm10Service->start(); // Deprecated in v2.5.0
     ESP_LOGI(TAG, "HM-10 Weight Service setup complete");
 }
 
@@ -361,9 +361,10 @@ void ScaleBLEService::setAndNotifyMeasurement(const WeightHistoryRecord &measure
     setAndNotifyWssMeasurement(measurement);
     setAndNotifyBcsMeasurement(measurement);
     setAndNotifyHm10Measurement(measurement);
+    mLastStatus = "Sent";
 }
 
-void ScaleBLEService::onWrite(NimBLECharacteristic *pCharacteristic)
+void ScaleBLEService::onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo& connInfo)
 {
     if (pCharacteristic == pHm10MeasurementCharacteristic)
     {
@@ -381,7 +382,7 @@ void ScaleBLEService::onWrite(NimBLECharacteristic *pCharacteristic)
     }
 }
 
-void ScaleBLEService::onDisconnect(NimBLEServer *pServer)
+void ScaleBLEService::onDisconnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo, int reason)
 {
     ESP_LOGI(TAG, "Client disconnected");
     // Start advertising again to allow a new client to connect

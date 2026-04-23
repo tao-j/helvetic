@@ -1,12 +1,12 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_log.h>
-#include <Wire.h>
+
 #include "dns_server.h"
 #include "web_server.h"
 #include "scale_ble_service.h"
-#include "rtc.h"
-#include <SPIFFS.h>
+#include <LittleFS.h>
+#include <M5Unified.h>
 
 const char *ssid = "DefaultSSID";         // Your desired SSID
 const char *password = "DefaultPassword"; // Your desired password (min 8 chars)
@@ -18,14 +18,43 @@ int height = 1800;                        // Default height in mm
 
 static const char *TAG = "MAIN"; // Tag for ESP logging
 
-// I2C pins for M5StickC Plus
-const int I2C_SDA_PIN = 21;
-const int I2C_SCL_PIN = 22;
+// Webserver and BLE services
 
 CaptiveDNSServer dnsServer;
 CaptiveWebServer webServer;
 ScaleBLEService bleService;
-RTC rtc(Wire);
+
+void updateDisplay()
+{
+    static uint32_t lastUpdate = 0;
+    if (millis() - lastUpdate < 1000)
+        return;
+    lastUpdate = millis();
+
+    M5.Display.setCursor(0, 0);
+    M5.Display.setTextColor(YELLOW, BLACK);
+    M5.Display.setTextSize(2);
+    M5.Display.println("HELVETIC");
+
+    M5.Display.setTextSize(1);
+    M5.Display.setTextColor(WHITE, BLACK);
+    
+    int batLevel = M5.Power.getBatteryLevel();
+    M5.Display.printf("Battery: %d%%\n\n", batLevel);
+
+    M5.Display.printf("SSID: %s\n", ssid);
+    M5.Display.printf("IP: %s\n", WiFi.softAPIP().toString().c_str());
+    M5.Display.printf("BLE: %d connected\n", bleService.getConnectedCount());
+    M5.Display.printf("BLE Status: %s\n", bleService.getLastStatus());
+
+    WeightHistoryRecord last = bleService.getLastMeasurement();
+    M5.Display.setTextColor(ORANGE, BLACK);
+    M5.Display.printf("Weight: %.2f kg\n", last.weight);
+    M5.Display.setTextColor(WHITE, BLACK);
+
+    auto dt = M5.Rtc.getDateTime();
+    M5.Display.printf("\nTime: %04d-%02d-%02d\n      %02d:%02d:%02d\n", dt.date.year, dt.date.month, dt.date.date, dt.time.hours, dt.time.minutes, dt.time.seconds);
+}
 
 // WiFi event handler
 void WiFiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
@@ -51,62 +80,26 @@ void WiFiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
 
 void setup()
 {
+    auto cfg = M5.config();
+    M5.begin(cfg);
+
+    M5.Display.setRotation(1);
+    M5.Display.fillScreen(BLACK);
+    M5.Display.setCursor(0, 0);
+    M5.Display.println("Initializing...");
+
     // Set log level
     esp_log_level_set("*", ESP_LOG_INFO);         // Set all components to INFO level
     esp_log_level_set("BLE_SCALE", ESP_LOG_INFO); // Set BLE_SCALE to INFO level
-
-    Serial.begin(115200);
-    delay(2000); // Give serial port time to initialize
-
-    // Set log level to ESP_LOG_VERBOSE
-    // esp_log_level_set("RTC", ESP_LOG_VERBOSE);
-
-    // Add I2C scanner code
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    ESP_LOGD(TAG, "I2C Scanner starting...");
-
-    byte error, address;
-    int devices = 0;
-
-    for (address = 1; address < 127; address++)
-    {
-        Wire.beginTransmission(address);
-        error = Wire.endTransmission();
-
-        if (error == 0)
-        {
-            ESP_LOGD(TAG, "I2C device found at address 0x%02X", address);
-            devices++;
-        }
-    }
-
-    if (devices == 0)
-    {
-        ESP_LOGE(TAG, "No I2C devices found");
-    }
-
-    // Initialize RTC
-    if (!rtc.begin())
-    {
-        ESP_LOGE(TAG, "Failed to initialize BM8563!");
-    }
-    else
-    {
-        ESP_LOGI(TAG, "BM8563 initialized successfully");
-    }
-    // Uncomment and set time if needed:
-    // rtc.setTime(2024, 12, 28, 10, 33, 0); // Year, Month, Day, Hour, Minute, Second
 
     // Initialize BLE service
     bleService.begin();
 
     // Pass BLE service to web server
     webServer.setScaleBLEService(&bleService);
-    // Pass RTC to web server
-    webServer.setRTC(&rtc);
 
     // Manually parse key=value configuration
-    File file = SPIFFS.open("/config.txt", "r");
+    File file = LittleFS.open("/config.txt", "r");
     if (!file)
     {
         ESP_LOGE(TAG, "Failed to open config file, using default configuration");
@@ -175,17 +168,17 @@ void setup()
 
 void loop()
 {
+    M5.update();
     dnsServer.processNextRequest();
     webServer.handleClient();
+    updateDisplay();
     // Get and log current RTC time every 10 seconds
     // static unsigned long lastPrint = 0;
     // if (millis() - lastPrint >= 10000)
     // {
-    //     uint16_t year;
-    //     uint8_t month, day, hour, minute, second;
-    //     rtc.getTime(year, month, day, hour, minute, second);
+    //     auto dt = M5.Rtc.getDateTime();
     //     ESP_LOGI(TAG, "Current time: %04d-%02d-%02d %02d:%02d:%02d",
-    //              year, month, day, hour, minute, second);
+    //              dt.date.year, dt.date.month, dt.date.date, dt.time.hours, dt.time.minutes, dt.time.seconds);
     //     lastPrint = millis();
     // }
 }

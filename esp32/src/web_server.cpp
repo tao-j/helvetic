@@ -117,15 +117,19 @@ void CaptiveWebServer::handleScaleValidate()
 // Helper function to convert RTC time to Unix timestamp
 uint32_t CaptiveWebServer::rtcToUnixTime()
 {
-    if (!rtc || !rtc->isRunning())
+    if (!M5.Rtc.isEnabled())
     {
         ESP_LOGW(TAG, "RTC not available or not running, using current time");
         return time(nullptr);
     }
 
-    uint16_t year;
-    uint8_t month, day, hour, minute, second;
-    rtc->getTime(year, month, day, hour, minute, second);
+    auto dt = M5.Rtc.getDateTime();
+    uint16_t year = dt.date.year;
+    uint8_t month = dt.date.month;
+    uint8_t day = dt.date.date;
+    uint8_t hour = dt.time.hours;
+    uint8_t minute = dt.time.minutes;
+    uint8_t second = dt.time.seconds;
 
     // Convert to Unix timestamp
     // Code from https://en.wikipedia.org/wiki/Unix_time#Encoding_time_as_a_number

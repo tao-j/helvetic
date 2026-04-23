@@ -2,8 +2,8 @@
 
 #include <WebServer.h>
 #include <WiFi.h>
+#include <M5Unified.h>
 #include "scale_ble_service.h"
-#include "rtc.h"
 
 class CaptiveWebServer
 {
@@ -12,7 +12,6 @@ public:
     void begin();
     void handleClient();
     void setScaleBLEService(ScaleBLEService *service) { bleService = service; }
-    void setRTC(RTC *rtc_instance) { rtc = rtc_instance; }
     void setUserParams(const char *name, uint8_t gender, int age, int height)
     {
         userName = name;
@@ -24,7 +23,6 @@ public:
 private:
     WebServer server;
     ScaleBLEService *bleService = nullptr;
-    RTC *rtc = nullptr;
     static const char responsePortal[];
     static const uint16_t crc16tab[256];
     const char *userName;
